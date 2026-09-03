@@ -4,7 +4,7 @@ realtime henson-like puppet with threejs and rapier, project at [Recurse Center]
 ### Plan for commits:
 - [x] establish repo
 - [x] project basic setup (vite, threejs, rapier3d)
-- [ ] sample threejs scene with lil-gui over top
+- [x] sample threejs scene with lil-gui over top
 - [ ] import rigged puppet and place puppet in threejs scene
 - [ ] ragdoll puppet with rapier3d
 - [ ] set up impulse joints connected to lil-gui

@@ -27,6 +27,7 @@ document.body.appendChild(renderer.domElement)
 let cube = new THREE.Mesh()
 const gui = new GUI()
 
+
 async function makeCube() {
     const geometry = new THREE.BoxGeometry(1, 1, 1)
     const material = new THREE.MeshStandardMaterial({ color: 0xffff00 })
