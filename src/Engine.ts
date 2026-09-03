@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import GUI from 'lil-gui'
+
 
 const scene = new THREE.Scene()
 
@@ -22,16 +24,54 @@ const renderer = new THREE.WebGLRenderer()
 renderer.setSize( window.innerWidth, window.innerHeight )
 document.body.appendChild(renderer.domElement)
 
-const geometry = new THREE.BoxGeometry(1, 1, 1)
-const material = new THREE.MeshStandardMaterial({ color: 0xffff00 })
-const cube = new THREE.Mesh( geometry, material )
-cube.castShadow = true
-scene.add(cube)
+let cube = new THREE.Mesh()
+const gui = new GUI()
 
+async function makeCube() {
+    const geometry = new THREE.BoxGeometry(1, 1, 1)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffff00 })
+    cube = new THREE.Mesh( geometry, material )
+    cube.castShadow = true
+    await scene.add(cube)
+    console.log(cube)
+
+    makeGui()
+
+    function makeGui() {
+        // GUI setup (break into its own file)
+        gui.add( document, 'title' )
+
+        gui.add( cube.position, 'x')
+            .min(-2)
+            .max(2)
+            .step(0.01)
+            .onChange( value => {
+                cube.position.setX(value)
+            })
+        gui.add( cube.position, 'y')
+            .min(-2)
+            .max(2)
+            .step(0.01)
+            .onChange( value => {
+                cube.position.setY(value)
+            })
+        gui.add( cube.position, 'z')
+            .min(-2)
+            .max(2)
+            .step(0.01)
+            .onChange( value => {
+                cube.position.setZ(value)
+            })
+
+
+    }
+
+}
 function animate( time ) {
     renderer.render (scene, camera)
     cube.rotation.x = time / 2000
     cube.rotation.y = time / 1000
 }
 
+makeCube()
 renderer.setAnimationLoop( animate )
