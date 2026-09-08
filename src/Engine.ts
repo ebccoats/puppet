@@ -35,12 +35,18 @@ const renderer = new THREE.WebGLRenderer()
 renderer.setSize( window.innerWidth, window.innerHeight )
 document.body.appendChild(renderer.domElement)
 
-// Make resizing work right
-let canvas = renderer.domElement
-canvas.style.width = "100%"
-canvas.style.height = "100%"
-canvas.style.display = "block"
-console.log(canvas.style)
+// Make resizing work right; this is part 1, part 2 is in render loop
+function resizeRendererToDisplaySize(renderer) {
+    let canvas = renderer.domElement
+    const width = canvas.clientWidth
+    const height = canvas.clientHeight
+    const needResize = canvas.width !== width || canvas.height !== height
+    if (needResize) {
+        renderer.setSize(width, height, false)
+    }
+    return needResize
+}
+
 
 // orbit controls for click, drag to move camera
 const orbit = new OrbitControls(camera, renderer.domElement)
@@ -109,12 +115,27 @@ let skeleton = new THREE.Skeleton()
 async function setup() {
     makePuppet()
 
+    let canvas = renderer.domElement
+    canvas.style.width = "100%"
+    canvas.style.height = "100%"
+    canvas.style.display = "block"
     // makeGui()
 }
 
-function animate( time ) {
+function render( time ) {
+    // this is part 2 of the resizing thing
+    time *= 0.001
+
+    if (resizeRendererToDisplaySize(renderer)) {
+        const canvas = renderer.domElement
+        camera.aspect = canvas.clientWidth / canvas.clientHeight
+        camera.updateProjectionMatrix()
+    }
+
+    // This is what renders the scene
     renderer.render (scene, camera)
+
 }
 
 setup()
-renderer.setAnimationLoop( animate )
+renderer.setAnimationLoop( render )
