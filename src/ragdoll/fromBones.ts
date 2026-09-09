@@ -25,12 +25,18 @@ export function makeCoreConfig(): RagdollConfig {
 
     const joints: JointDef[] = parts
         .filter((part) => part.parent)
-        .map((part) => ({
-            id: `j-${part.parent}-${part.id}`,
-            a: part.parent!,
-            b: part.id,
-            type: 'spherical',
-        }))
+        .map((part) => {
+            const knee = part.id === 'lower_leg.L' || part.id === 'lower_leg.R'
+            return {
+                id: `j-${part.parent}-${part.id}`,
+                a: part.parent!,
+                b: part.id,
+                type: knee ? 'revolute' : 'spherical',
+                axis: knee ? [1, 0, 0] : undefined,
+                limits: knee ? [-2.4, 0.15] : undefined,
+
+            }
+        })
 
     return { parts, joints }
 }

@@ -9,7 +9,9 @@ export type JointDef = {
     id: string
     a: string
     b: string
-    type: 'spherical'
+    type: 'spherical' | 'revolute'
+    axis?: [number, number, number]
+    limits?: [number, number]
 }
 
 export type RagdollConfig = { parts: PartDef[]; joints: JointDef[] }

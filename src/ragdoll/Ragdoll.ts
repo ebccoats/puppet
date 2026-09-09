@@ -38,7 +38,6 @@ export class Ragdoll {
         const bone = puppet.skeleton.getBoneByName(part.id)!
         const quaternion = new THREE.Quaternion()
         bone.getWorldQuaternion(quaternion)
-        this.restWorldQuaternion.set(part.id, quaternion.clone())
 
         const desc = 
             part.bodyType === 'kinematic' ? RAPIER.RigidBodyDesc.kinematicPositionBased()
@@ -88,6 +87,9 @@ export class Ragdoll {
         body.setEnabled(false) // freeze until you inspect
         this.bodies.set(part.id, body)
 
+        const br = body.rotation()
+        const bodyBind = new THREE.Quaternion(br.x, br.y, br.z, br.w)
+        this.restWorldQuaternion.set(part.id, bodyBind.invert().multiply(quaternion))
     }
 
     const bitOf = new Map<string, number>()
@@ -110,20 +112,36 @@ export class Ragdoll {
     for (const joint of config.joints) {
         const bodyA = this.bodies.get(joint.a)
         const bodyB = this.bodies.get(joint.b)
-        const colA = bodyA.collider(0)
-        const colB = bodyB.collider(0)
-        const halfA = colA.halfExtents().y
-        const halfB = colB.halfExtents().y
 
-        world.createImpulseJoint(
-            RAPIER.JointData.spherical(
-                { x: 0, y: halfA, z: 0 },
-                { x: 0, y: -halfB, z: 0 },
-            ),
-            bodyA,
-            bodyB,
-            true,
-        )
+        const worldPoint = boneWorld(joint.b) // child's bone origin
+
+        const toLocal = (body: any, point: THREE.Vector3) => {
+            const t = body.translation()
+            const r = body.rotation()
+            const q = new THREE.Quaternion(r.x, r.y, r.z, r.w)
+            return point.clone().sub(new THREE.Vector3(t.x, t.y, t.z)).applyQuaternion(q.clone().invert())
+        }
+
+        const a = toLocal(bodyA, worldPoint)
+        const b = toLocal(bodyB, worldPoint)
+
+        const anchorA = { x: a.x, y: a.y, z: a.z }
+        const anchorB = { x: b.x, y: b.y, z: b.z }
+
+        const data = 
+            joint.type === 'revolute'
+                ? RAPIER.JointData.revolute(anchorA, anchorB, {
+                    x: joint.axis![0],
+                    y: joint.axis![1],
+                    z: joint.axis![2],
+                })
+                : RAPIER.JointData.spherical(anchorA, anchorB)
+
+        const created = world.createImpulseJoint(data, bodyA, bodyB, true)
+
+        if (joint.type === 'revolute' && joint.limits) {
+            created.setLimits(joint.limits[0], joint.limits[1])
+        }
     }
 
     }
