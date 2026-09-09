@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import GUI from 'lil-gui'
-import { GLTFLoader } from 'three/examples/jsm/Addons.js'
 import { OrbitControls } from 'three/examples/jsm/Addons.js'
-import { CCDIKSolver } from 'three/examples/jsm/Addons.js'
+import { Puppet } from './Puppet'
 
+let puppet: Puppet
 
 const scene = new THREE.Scene()
 
@@ -55,59 +55,10 @@ orbit.target.set(0, 0, 0)
 orbit.update()
 
 
-const loader = new GLTFLoader()
-let puppet
-let skeleton: THREE.Skeleton
-let ikSolver: CCDIKSolver
-
-function boneIndex(name: string) {
-    const index = skeleton.bones.findIndex(bone => bone.name === name)
-    if (index < 0) throw new Error(`missing bone ${name}`)
-    return index
-}
-
-function makeArmIK(side: string) {
-    return {
-        target: boneIndex(`ik_target_armstick.${side}`),
-        effector: boneIndex(`arm_stick.${side}`),
-        iteration: 10,
-        maxAngle: 0.5,
-        links: [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(n => ({
-            index: boneIndex(`arm.${side}.${n}`),
-        })),
-
-    }
-}
-
-function makePuppet() {
-    const puppetPath = new URL('./assets/puppet_re-rig.glb', import.meta.url).href
-    loader.load(puppetPath, (gltf) => {
-        let skinnedMesh
-        gltf.scene.scale.setScalar(0.5)
-        gltf.scene.position.setY(-2.5)
-
-        gltf.scene.traverse( (child) => {
-            if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-                const mesh = child as THREE.SkinnedMesh
-                skinnedMesh = mesh
-                skeleton = mesh.skeleton
-            }
-
-        })
-
-        skeleton.bones.forEach((bone) => {
-            if (bone.userData.name) bone.name = bone.userData.name
-        })
-
-        puppet = gltf.scene
-        scene.add(puppet)
-        ikSolver = new CCDIKSolver(skinnedMesh, [makeArmIK('L'), makeArmIK('R')])
-
-    })
-}
 
 async function setup() {
-    makePuppet()
+
+    puppet = new Puppet(scene)
 
     let canvas = renderer.domElement
     canvas.style.width = "100%"
@@ -129,16 +80,13 @@ const position = {
     },
 }
 
-const mouth = { rotationDeg: 92 }
-
-
 const gui = new GUI()
 
 function makeGui() {
     // GUI setup (break into its own file)
     gui.add( document, 'title' )
 
-    gui.add( mouth, 'rotationDeg')
+    gui.add( puppet.mouth, 'rotationDeg')
     .min(90)
     .max(126)
     .step(0.5)
@@ -169,7 +117,7 @@ function makeGui() {
 }
 
 function offsetTarget(side: string) {
-    const bone = skeleton.getBoneByName(`ik_target_armstick.${side}`)
+    const bone = puppet.skeleton.getBoneByName(`ik_target_armstick.${side}`)
     if (side === 'L') {
         bone.position.x = position.L.x
         bone.position.y = position.L.y
@@ -179,11 +127,6 @@ function offsetTarget(side: string) {
         bone.position.y = position.R.y
         bone.position.z = position.R.z
     }
-}
-
-function updateMouth() {
-    const mouthBone = skeleton.getBoneByName('puppeteer_thumb')
-    mouthBone.rotation.x = THREE.MathUtils.degToRad(mouth.rotationDeg)
 }
 
 function render( time ) {
@@ -196,12 +139,12 @@ function render( time ) {
         camera.updateProjectionMatrix()
     }
 
-    if (skeleton && ikSolver) {
+    if (puppet.skeleton && puppet.ikSolver) {
         offsetTarget("L")
         offsetTarget("R") 
-        updateMouth()
-        skeleton.bones[0]?.updateMatrixWorld(true)
-        ikSolver.update()
+        puppet.updateMouth()
+        puppet.skeleton.bones[0]?.updateMatrixWorld(true)
+        puppet.ikSolver.update()
 
     }
     // This is what renders the scene
