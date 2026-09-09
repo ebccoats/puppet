@@ -49,6 +49,8 @@ export class Ragdoll {
             'puppeteer_upper_arm',
             'puppeteer_forearm',
             'puppeteer_wrist',
+            'shoulder.L',
+            'shoulder.R',
         ])
         const kids = childrenOf.get(part.id) ?? []
         const nextId = !hub.has(part.id) && kids.length === 1 ? kids[0] : undefined
@@ -84,7 +86,12 @@ export class Ragdoll {
             col.setDensity(part.density)
         }
 
+        body.setAngularDamping(1)
+        body.setLinearDamping(0.2)
         body.setEnabled(false) // freeze until you inspect
+
+
+
         this.bodies.set(part.id, body)
 
         const br = body.rotation()
@@ -93,7 +100,16 @@ export class Ragdoll {
     }
 
     const bitOf = new Map<string, number>()
-    config.parts.forEach((p, i) => bitOf.set(p.id, 1 << (i + 1)))
+
+    for (const part of config.parts) {
+        if (part.id.startsWith('arm.L') || part.id === 'hand.L') {
+            bitOf.set(part.id, 1 << 1)
+        } else if (part.id.startsWith('arm.R') || part.id === 'hand.R') {
+            bitOf.set(part.id, 1 << 2)
+        } else {
+            bitOf.set(part.id, 1 << 3)
+        }
+    }
 
     for (const part of config.parts) {
         const membership = bitOf.get(part.id)!

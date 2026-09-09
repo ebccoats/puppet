@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/Addons.js'
 import { Puppet } from './Puppet'
 import { getRapier } from './physics/rapier'
 import { RapierDebugRenderer } from './debug/RapierDebugRenderer'
-import { makeCoreConfig } from './ragdoll/fromBones'
+import { makePuppetConfig } from './ragdoll/fromBones'
 import { Ragdoll, groups } from './ragdoll/Ragdoll'
 
 let RAPIER
@@ -128,7 +128,7 @@ async function setup() {
     puppet = new Puppet()
     await puppet.load(scene)
 
-    ragdoll = new Ragdoll(RAPIER, world, puppet, makeCoreConfig())
+    ragdoll = new Ragdoll(RAPIER, world, puppet, makePuppetConfig())
 
     let canvas = renderer.domElement
     canvas.style.width = "100%"

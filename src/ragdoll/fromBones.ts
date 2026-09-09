@@ -40,3 +40,46 @@ export function makeCoreConfig(): RagdollConfig {
 
     return { parts, joints }
 }
+
+export function makeArmChain(side: 'L' | 'R', density = 0.12): RagdollConfig {
+    const parts: PartDef[] = []
+    const joints: JointDef[] = []
+
+    for (let i = 1; i <= 16; i++) {
+        const id = `arm.${side}.${i}`
+        const parent = i === 1 ? `shoulder.${side}` : `arm.${side}.${i - 1}`
+
+        parts.push({ id, parent, density })
+        joints.push({
+            id: `j-${parent}-${id}`,
+            a: parent,
+            b: id,
+            type: 'spherical',
+        })
+    }
+
+    parts.push({
+        id: `hand.${side}`,
+        parent: `arm.${side}.16`,
+        density
+    })
+    joints.push({
+        id: `j-arm16-hand.${side}`,
+        a: `arm.${side}.16`,
+        b: `hand.${side}`,
+        type: 'spherical',
+    })
+
+    return {parts, joints}
+}
+
+export function makePuppetConfig(): RagdollConfig {
+    const core = makeCoreConfig()
+    const left = makeArmChain('L')
+    const right = makeArmChain('R')
+    
+    return {
+        parts: [...core.parts, ...left.parts, ...right.parts],
+        joints: [...core.joints, ...left.joints, ...right.joints],
+    }
+}
