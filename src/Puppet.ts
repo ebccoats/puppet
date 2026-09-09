@@ -19,7 +19,7 @@ export class Puppet {
 
             let skinnedMesh
             gltf.scene.scale.setScalar(0.5)
-            gltf.scene.position.setY(-2.5)
+            gltf.scene.position.setY(0)
 
             gltf.scene.traverse( (child) => {
                 if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
