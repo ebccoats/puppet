@@ -4,13 +4,15 @@ import { OrbitControls } from 'three/examples/jsm/Addons.js'
 import { Puppet } from './Puppet'
 import { getRapier } from './physics/rapier'
 import { RapierDebugRenderer } from './debug/RapierDebugRenderer'
+import { makeCoreConfig } from './ragdoll/fromBones'
+import { Ragdoll, groups } from './ragdoll/Ragdoll'
+
+let RAPIER
 
 let world
-let boxBody
-let boxMesh
-let boxCollider
 let debug
-let centerOfMassMarker
+
+let ragdoll: Ragdoll
 
 const params = {
     gravity: -9.81,
@@ -19,6 +21,36 @@ const params = {
     ox: 0,
     oy: 0,
     oz: 0,
+    freeze: true,
+    ragdoll: false,
+}
+
+const gui = new GUI()
+
+function makeGui() {
+    // GUI setup (break into its own file)
+    gui.add( document, 'title' )
+
+    gui.add( puppet.mouth, 'rotationDeg')
+    .min(90)
+    .max(126)
+    .step(0.5)
+
+    gui.add(params, 'gravity', -40, 10, 0.1)
+    gui.add(params, 'debugPhysics').onChange((v: boolean) => {
+        debug.toggleVisible(v)
+    })
+    gui.add(params, 'freeze').onChange((on:boolean) => {
+        ragdoll.setFrozen(on)
+    })
+    
+    gui.add(params, 'ragdoll')
+
+    gui.add({ drop: () => {
+        const root = ragdoll.bodies.get('root')
+        root.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
+        root.wakeUp()
+    }}, 'drop')
 }
 
 let puppet: Puppet
@@ -31,7 +63,7 @@ const near = 0.1
 const far = 100
 
 const camera = new THREE.PerspectiveCamera( fov, aspect, near, far )
-camera.position.set(0, 10, 20)
+camera.position.set(0, 10, 10)
 camera.lookAt(0, 0, 0)
 
 
@@ -72,15 +104,8 @@ const orbit = new OrbitControls(camera, renderer.domElement)
 orbit.target.set(0, 0, 0)
 orbit.update()
 
-
 async function setup() {
-    const RAPIER = await getRapier()
-
-    centerOfMassMarker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08),
-        new THREE.MeshBasicMaterial({ color: 0xffff00 }),
-    )
-    scene.add(centerOfMassMarker)
+    RAPIER = await getRapier() 
 
     world = new RAPIER.World({ x: 0, y: params.gravity, z: 0 })
 
@@ -90,7 +115,7 @@ async function setup() {
     const ground = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(0, -groundHalfHeight, 0),
     )
-    world.createCollider(RAPIER.ColliderDesc.cuboid(10, groundHalfHeight, 10), ground)
+    world.createCollider(RAPIER.ColliderDesc.cuboid(10, groundHalfHeight, 10), ground).setCollisionGroups(groups(1 << 0, 0xffff))
     const groundGeometry = new THREE.PlaneGeometry( 20, 20 )
     const groundMaterial = new THREE.MeshPhongMaterial( { color: 0xCC8866 })
     const groundMesh = new THREE.Mesh( groundGeometry, groundMaterial )
@@ -98,23 +123,12 @@ async function setup() {
     groundMesh.receiveShadow = true
     scene.add(groundMesh)
 
-    boxBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 2, 0),
-    )
-    boxCollider = world.createCollider(RAPIER.ColliderDesc.cuboid(0.25, 0.25, 0.25), boxBody)
-    boxCollider.setDensity(params.density)
-    boxCollider.setTranslationWrtParent({ x: params.ox, y: params.oy, z: params.oz })
-    boxBody.recomputeMassPropertiesFromColliders()
-
-    boxMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.5, 0.5),
-        new THREE.MeshPhongMaterial({ color: 0x88ccff })
-    )
-    scene.add(boxMesh)
-
     debug = new RapierDebugRenderer(scene, world, params.debugPhysics)
 
-    puppet = new Puppet(scene)
+    puppet = new Puppet()
+    await puppet.load(scene)
+
+    ragdoll = new Ragdoll(RAPIER, world, puppet, makeCoreConfig())
 
     let canvas = renderer.domElement
     canvas.style.width = "100%"
@@ -123,84 +137,21 @@ async function setup() {
     makeGui()
 }
 
-const position = {
-    R: {
-        x: 0,
-        y: 0,
-        z: 0,
-    },
-    L: {
-        x: 0,
-        y: 0,
-        z: 0,
-    },
-}
 
-const gui = new GUI()
 
-function makeGui() {
-    // GUI setup (break into its own file)
-    gui.add( document, 'title' )
 
-    gui.add( puppet.mouth, 'rotationDeg')
-    .min(90)
-    .max(126)
-    .step(0.5)
-
-    gui.add(params, 'gravity', -40, 10, 0.1)
-    gui.add(params, 'debugPhysics').onChange((v: boolean) => {
-        debug.toggleVisible(v)
-    })
-
-    gui.add(params, 'density', 0.01, 20, 0.01).onChange(applyMass)
-    gui.add(params, 'ox', -1, 1, 0.01).onChange(applyMass)
-    gui.add(params, 'oy', -1, 1, 0.01).onChange(applyMass)
-    gui.add(params, 'oz', -1, 1, 0.01).onChange(applyMass)
-
-    gui.add( position.R, 'x')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-    gui.add( position.R, 'y')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-    gui.add( position.R, 'z')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-    gui.add( position.L, 'x')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-    gui.add( position.L, 'y')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-    gui.add( position.L, 'z')
-    .min(-5)
-    .max(5)
-    .step(0.01)
-}
-
-function applyMass() {
-    boxCollider.setDensity(params.density)
-    boxCollider.setTranslationWrtParent({ x: params.ox, y: params.oy, z: params.oz })
-    boxBody.recomputeMassPropertiesFromColliders()
-}
-
-function offsetTarget(side: string) {
-    const bone = puppet.skeleton.getBoneByName(`ik_target_armstick.${side}`)
-    if (side === 'L') {
-        bone.position.x = position.L.x
-        bone.position.y = position.L.y
-        bone.position.z = position.L.z
-    } else if (side === 'R') {
-        bone.position.x = position.R.x
-        bone.position.y = position.R.y
-        bone.position.z = position.R.z
-    }
-}
+// function offsetTarget(side: string) {
+//     const bone = puppet.skeleton.getBoneByName(`ik_target_armstick.${side}`)
+//     if (side === 'L') {
+//         bone.position.x = position.L.x
+//         bone.position.y = position.L.y
+//         bone.position.z = position.L.z
+//     } else if (side === 'R') {
+//         bone.position.x = position.R.x
+//         bone.position.y = position.R.y
+//         bone.position.z = position.R.z
+//     }
+// }
 
 function render( time ) {
     // this is part 2 of the resizing thing
@@ -216,24 +167,20 @@ function render( time ) {
         world.gravity = { x: 0, y: params.gravity, z: 0 }
         world.step()
 
-        const com = boxBody.worldCom()
-        centerOfMassMarker.position.set(com.x, com.y, com.z)
+        if (params.ragdoll) {
+            ragdoll.syncBones(puppet)
+        } else if (puppet?.skeleton && puppet.ikSolver) {
+            puppet.updateMouth()
+            puppet.skeleton.bones[0]?.updateMatrixWorld(true)
+            puppet.ikSolver.update()
 
-        const t = boxBody.translation()
-        const r = boxBody.rotation()
-        boxMesh.position.set(t.x, t.y, t.z)
-        boxMesh.quaternion.set(r.x, r.y, r.z, r.w)
+            puppet.updateMouth()
+
+        }
 
         debug.update()
     }
-    if (puppet?.skeleton && puppet?.ikSolver) {
-        offsetTarget("L")
-        offsetTarget("R") 
-        puppet.updateMouth()
-        puppet.skeleton.bones[0]?.updateMatrixWorld(true)
-        puppet.ikSolver.update()
 
-    }
     // This is what renders the scene
     renderer.render (scene, camera)
 

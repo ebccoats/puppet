@@ -10,37 +10,42 @@ export class Puppet {
         rotationDeg: number
     }
 
-    constructor(scene: THREE.Scene) {
+    constructor() {
         this.mouth = { rotationDeg: 92 }
 
+    }
+
+    public load(scene: THREE.Scene): Promise<void> {
         const puppetPath = new URL('./assets/puppet_re-rig.glb', import.meta.url).href
         const loader = new GLTFLoader()
-        loader.load(puppetPath, (gltf) => {
+        return new Promise((resolve, reject) => {
+            loader.load(puppetPath, (gltf) => {
+                let skinnedMesh
+                gltf.scene.scale.setScalar(0.5)
+                gltf.scene.position.setY(0)
 
-            let skinnedMesh
-            gltf.scene.scale.setScalar(0.5)
-            gltf.scene.position.setY(0)
+                gltf.scene.traverse( (child) => {
+                    if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
+                        const mesh = child as THREE.SkinnedMesh
+                        skinnedMesh = mesh
+                        this.skeleton = mesh.skeleton
+                    }
 
-            gltf.scene.traverse( (child) => {
-                if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-                    const mesh = child as THREE.SkinnedMesh
-                    skinnedMesh = mesh
-                    this.skeleton = mesh.skeleton
-                }
+                })
 
-            })
-
-            this.skeleton.bones.forEach((bone) => {
-                if (bone.userData.name) bone.name = bone.userData.name
-            })
+                this.skeleton.bones.forEach((bone) => {
+                    if (bone.userData.name) bone.name = bone.userData.name
+                })
 
             this.scene = gltf.scene
             scene.add(this.scene)
             this.ikSolver = new CCDIKSolver(skinnedMesh, [this.makeArmIK('L'), this.makeArmIK('R')])
-        })
-        
-    }
+            this.scene.updateMatrixWorld(true)
+            resolve()
 
+            }, undefined, reject)
+        })
+    }
 
     public updateMouth() {
         const mouthBone = this.skeleton.getBoneByName('puppeteer_thumb')
