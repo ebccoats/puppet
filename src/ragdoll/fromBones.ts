@@ -2,7 +2,7 @@ import type { RagdollConfig, PartDef, JointDef } from './config'
 
 export function makeCoreConfig(): RagdollConfig {
     const parts: PartDef[] = [
-        { id: 'root', bodyType: 'kinematic', density: 1 },
+        { id: 'root', bodyType: 'fixed', density: 1 },
         { id: 'puppeteer_upper_arm', parent: 'root', density: 1 },
         { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1 },
 
