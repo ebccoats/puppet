@@ -3,8 +3,10 @@ import type { RagdollConfig, PartDef, JointDef } from './config'
 export function makeCoreConfig(): RagdollConfig {
     const parts: PartDef[] = [
         { id: 'root', bodyType: 'fixed', density: 1 },
-        { id: 'puppeteer_upper_arm', parent: 'root', density: 1 },
-        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1 },
+        { id: 'puppeteer_upper_arm', parent: 'root', density: 1, bodyType: 'fixed'},
+        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1, bodyType: 'fixed'},
+        { id: 'puppeteer_wrist', parent: 'puppeteer_forearm', density: 0.8, bodyType: 'fixed'},
+        { id: 'puppeteer_thumb', parent: 'puppeteer_wrist', density: 0.2 },
 
         { id: 'hip.L', parent: 'puppeteer_forearm', density: 0.8 },
         { id: 'upper_leg.L', parent: 'hip.L', density: 0.5 },
@@ -16,8 +18,6 @@ export function makeCoreConfig(): RagdollConfig {
         { id: 'lower_leg.R', parent: 'upper_leg.R', density: 0.5 },
         { id: 'foot.R', parent: 'lower_leg.R', density: 0.4 },
 
-        { id: 'puppeteer_wrist', parent: 'puppeteer_forearm', density: 0.8 },
-        { id: 'puppeteer_thumb', parent: 'puppeteer_wrist', density: 0.2 },
 
         { id: 'shoulder.L', parent: 'puppeteer_forearm', density: 0.5 },
         { id: 'shoulder.R', parent: 'puppeteer_forearm', density: 0.5 },
@@ -27,13 +27,25 @@ export function makeCoreConfig(): RagdollConfig {
         .filter((part) => part.parent)
         .map((part) => {
             const knee = part.id === 'lower_leg.L' || part.id === 'lower_leg.R'
+            const thumb = part.id === 'puppeteer_thumb'
+            const shoulder = part.id === 'shoulder.L' || part.id === 'shoulder.R'
+            const hinge = knee || thumb 
             return {
                 id: `j-${part.parent}-${part.id}`,
                 a: part.parent!,
                 b: part.id,
-                type: knee ? 'revolute' : 'spherical',
-                axis: knee ? [1, 0, 0] : undefined,
-                limits: knee ? [-2.4, 0.15] : undefined,
+                type: hinge ? 'revolute' : 'spherical',
+                axis: hinge ? [1, 0, 0] : undefined,
+                limits: thumb
+                    ? [
+                        ((90 - 92) * Math.PI) / 180, // closed max
+                        ((150 - 92) * Math.PI) / 180, // open 88 deg
+                    ]
+                    :shoulder
+                        ? [-Math.PI / 2, Math.PI / 2]
+                        : knee 
+                            ? [-2.4, 0.15] 
+                            : undefined,
 
             }
         })
