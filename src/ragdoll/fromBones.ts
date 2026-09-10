@@ -3,9 +3,9 @@ import type { RagdollConfig, PartDef, JointDef } from './config'
 export function makeCoreConfig(): RagdollConfig {
     const parts: PartDef[] = [
         { id: 'root', bodyType: 'fixed', density: 1 },
-        { id: 'puppeteer_upper_arm', parent: 'root', density: 1, bodyType: 'fixed'},
-        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1, bodyType: 'fixed'},
-        { id: 'puppeteer_wrist', parent: 'puppeteer_forearm', density: 0.8, bodyType: 'fixed'},
+        { id: 'puppeteer_upper_arm', parent: 'root', density: 1},
+        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1},
+        { id: 'puppeteer_wrist', parent: 'puppeteer_forearm', density: 0.8, bodyType: 'kinematic'},
         { id: 'puppeteer_thumb', parent: 'puppeteer_wrist', density: 0.2 },
 
         { id: 'hip.L', parent: 'puppeteer_forearm', density: 0.8 },
@@ -29,18 +29,24 @@ export function makeCoreConfig(): RagdollConfig {
             const knee = part.id === 'lower_leg.L' || part.id === 'lower_leg.R'
             const thumb = part.id === 'puppeteer_thumb'
             const shoulder = part.id === 'shoulder.L' || part.id === 'shoulder.R'
-            const hinge = knee || thumb 
+            const puppeteerElbow = part.id === 'puppeteer_forearm'
+            const hinge = knee || thumb || puppeteerElbow
             return {
                 id: `j-${part.parent}-${part.id}`,
                 a: part.parent!,
                 b: part.id,
                 type: hinge ? 'revolute' : 'spherical',
-                axis: hinge ? [1, 0, 0] : undefined,
+                axis: hinge 
+                    ? [1, 0, 0] 
+                    : puppeteerElbow ? [1, 0, 0]
+                    : undefined,
                 limits: thumb
                     ? [
                         ((90 - 92) * Math.PI) / 180, // closed max
                         ((150 - 92) * Math.PI) / 180, // open 88 deg
                     ]
+                    : puppeteerElbow 
+                        ? [-1.2, 0.4]
                     :shoulder
                         ? [-Math.PI / 2, Math.PI / 2]
                         : knee 

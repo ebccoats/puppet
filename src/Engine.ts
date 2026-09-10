@@ -34,6 +34,13 @@ function makeGui() {
     gui.add( document, 'title' )
 
     gui.add(pose, 'thumbDeg', 90, 150, 0.5).name('mouth')
+    const head = gui.addFolder('head')
+    head.add(pose, 'headTilt', -45, 45, 1).name('tilt')
+    head.add(pose, 'headTurn', -80, 80, 1).name('turn')
+    head.add(pose, 'headRoll', -35, 35, 1).name('roll')
+
+    gui.add(pose, 'puppeteerElbowDeg', -70, 40, 1).name('puppeteer elbow bend')
+
     const arms = gui.addFolder('arms')
     arms.add(pose, 'shoulderL', -90, 90, 1)
     arms.add(pose, 'shoulderR', -90, 90, 1)

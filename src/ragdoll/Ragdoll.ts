@@ -3,6 +3,7 @@ import type { Rapier } from '../physics/rapier'
 import type { Puppet } from '../Puppet'
 import type { RagdollConfig } from './config'
 import { THUMB_BIND_DEG } from './pose'
+import RAPIER from '@dimforge/rapier3d'
 
 export function groups(membership: number, filter: number) {
     return (membership << 16) | filter
@@ -18,6 +19,9 @@ export class Ragdoll {
     armLength = new Map<string, number>()
 
     boneOriginLocal = new Map<string, THREE.Vector3>()
+
+    wristBind = new THREE.Matrix4()
+    forearmBind = new THREE.Matrix4()
 
     constructor(
         RAPIER: Rapier,
@@ -101,6 +105,7 @@ export class Ragdoll {
             col.setDensity(part.density)
         }
 
+
         body.setAngularDamping(1)
         body.setLinearDamping(0.2)
 
@@ -116,9 +121,20 @@ export class Ragdoll {
 
         this.bodies.set(part.id, body)
 
+        const t = body.translation()
+        const r = body.rotation()
+        const m = new THREE.Matrix4().compose(
+            new THREE.Vector3(t.x, t.y, t.z),
+            new THREE.Quaternion(r.x, r.y, r.z, r.w),
+            new THREE.Vector3(1, 1, 1),
+        )
+        if (part.id === 'puppeteer_forearm') this.forearmBind = m
+        if (part.id === 'puppeteer_wrist') this.wristBind = m
+
         const br = body.rotation()
         const bodyBind = new THREE.Quaternion(br.x, br.y, br.z, br.w)
         this.restWorldQuaternion.set(part.id, bodyBind.invert().multiply(quaternion))
+
     }
 
     const bitOf = new Map<string, number>()
@@ -141,6 +157,8 @@ export class Ragdoll {
     }
 
     for (const joint of config.joints) {
+        if (joint.b === 'puppeteer_wrist') continue
+
         const bodyA = this.bodies.get(joint.a)
         const bodyB = this.bodies.get(joint.b)
 
@@ -188,6 +206,18 @@ export class Ragdoll {
             axis = { x: axisLocal.x, y: axisLocal.y, z: axisLocal.z }
         }
 
+        if (joint.b === 'puppeteer_forearm') {
+            const bone = puppet.skeleton.getBoneByName('puppeteer_upper_arm')!
+            const axisWorld = new THREE.Vector3(1, 0, 0).applyQuaternion(
+                bone.getWorldQuaternion(new THREE.Quaternion()),
+            )
+            const wr = bodyA.rotation()
+            const axisLocal = axisWorld.applyQuaternion(
+                new THREE.Quaternion(wr.x, wr.y, wr.z, wr.w).invert(),
+            )
+            axis = { x: axisLocal.x, y: axisLocal.y, z: axisLocal.z }
+        }
+
         const twistLock = 
             RAPIER.JointAxesMask.LinX |
             RAPIER.JointAxesMask.LinY |
@@ -213,12 +243,35 @@ export class Ragdoll {
             created.setLimits(joint.limits[0], joint.limits[1])
         }
 
+        if (joint.b === 'puppeteer_forearm') {
+            created.configureMotorModel(RAPIER.MotorModel.ForceBased)
+            created.setMotorMaxForce(1000)
+        }
+
+        if (joint.b === 'puppeteer_upper_arm') {
+            const j = new RAPIER.SphericalImpulseJoint(
+                created.rawSet,
+                created.bodySet,
+                created.handle,
+            )
+            for (const axis of [
+                RAPIER.JointAxis.AngX,
+                RAPIER.JointAxis.AngY,
+                RAPIER.JointAxis.AngZ, 
+            ]) {
+                j.configureMotorModel(axis, RAPIER.MotorModel.ForceBased)
+                j.setMotorMaxForce(axis, 1000)
+            }
+            this.joints.set(joint.b, j)
+        } else {
+            this.joints.set(joint.b, created)
+        }
+
         if (joint.b === 'puppeteer_thumb') {
             created.configureMotorModel(RAPIER.MotorModel.ForceBased)
             created.setMotorMaxForce(1000)
         }
 
-        this.joints.set(joint.b, created)
     }
 
     for (const side of ['L', 'R'] as const) {
@@ -256,6 +309,8 @@ export class Ragdoll {
 
     }
 
+    this.bodies.get('puppeteer_wrist')!.setEnabled(true)
+
     // end of constructor
     console.log('thumb joint', this.joints.get('puppeteer_thumb'))
     }
@@ -263,7 +318,7 @@ export class Ragdoll {
 
     setFrozen(on: boolean) {
         for (const [id, body] of this.bodies) {
-            if (id === 'root') continue
+            if (id === 'root' || id === 'puppeteer_wrist') continue
             body.setEnabled(!on)
         }
     }
@@ -281,7 +336,10 @@ export class Ragdoll {
             if (
                 id === 'root' ||
                 id.startsWith('arm.') ||
-                id.startsWith('hand.')
+                id.startsWith('hand.') ||
+                id === 'puppeteer_upper_arm' ||
+                id === 'puppeteer_forearm' ||
+                id === 'puppeteer_wrist'
             ) {
                 const t  = body.translation()
                 const local = this.boneOriginLocal.get(id) ?? new THREE.Vector3()
@@ -302,6 +360,42 @@ export class Ragdoll {
 
     }
 
+    setPuppeteerWrist(pose) {
+        const ft = this.bodies.get('puppeteer_forearm')!.translation()
+        const fr = this.bodies.get('puppeteer_forearm')!.rotation()
+        const forearmNow = new THREE.Matrix4().compose(
+            new THREE.Vector3(ft.x, ft.y, ft.z),
+            new THREE.Quaternion(fr.x, fr.y, fr.z, fr.w),
+            new THREE.Vector3(1, 1, 1),
+        )
+        
+        const wristNow = forearmNow.clone()
+            .multiply(this.forearmBind.clone().invert())
+            .multiply(this.wristBind)
+
+
+        const head = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(
+                THREE.MathUtils.degToRad(pose.headTilt),
+                THREE.MathUtils.degToRad(pose.headTurn),
+                THREE.MathUtils.degToRad(pose.headRoll),
+                'YXZ', // yaw, pitch, roll
+            ),
+        )
+
+        wristNow.multiply(new THREE.Matrix4().makeRotationFromQuaternion(head))
+
+        const p = new THREE.Vector3()
+        const q = new THREE.Quaternion()
+        wristNow.decompose(p, q, new THREE.Vector3())
+        const wrist = this.bodies.get('puppeteer_wrist')!
+
+        wrist.setNextKinematicTranslation({ x: p.x, y: p.y, z: p.z })
+        wrist.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w})
+        wrist.wakeUp()
+
+   }
+
     setThumbDeg(deg: number, bind = 92) {
         const j = this.joints.get('puppeteer_thumb')
         j.configureMotorPosition(
@@ -311,6 +405,35 @@ export class Ragdoll {
         )
         this.bodies.get('puppeteer_thumb')!.wakeUp()
         this.bodies.get('puppeteer_wrist')!.wakeUp()
+    }
+
+    setPuppeteerElbowDeg(deg: number) {
+        const j = this.joints.get('puppeteer_forearm')
+        j.configureMotorPosition(
+            THREE.MathUtils.degToRad(deg),
+            400, // stiffness
+            20, // damping
+        )
+
+        this.bodies.get('puppeteer_forearm')!.wakeUp()
+        this.bodies.get('puppeteer_upper_arm')!.wakeUp()
+    }
+
+    setPuppeteerUpperArmHold() {
+        const j = this.joints.get('puppeteer_upper_arm')
+        for (const axis of [
+            RAPIER.JointAxis.AngX, 
+            RAPIER.JointAxis.AngY, 
+            RAPIER.JointAxis.AngZ
+        ]) {
+            j.configureMotorPosition(
+                axis,
+                0, // 0 = bind
+                400, // stiffness
+                20, // damping
+            )
+        }
+        this.bodies.get('puppeteer_upper_arm')!.wakeUp()
     }
 
     setShoulderDeg(side: 'L' | 'R', deg: number) {
@@ -356,6 +479,9 @@ export class Ragdoll {
     }
 
     setPose(pose: { thumbDeg: number; shoulderL: number; shoulderR: number }) {
+        this.setPuppeteerUpperArmHold()
+        this.setPuppeteerElbowDeg(pose.puppeteerElbowDeg)
+        this.setPuppeteerWrist(pose)
         this.setThumbDeg(pose.thumbDeg, THUMB_BIND_DEG)
         // this.setShoulderDeg('L', pose.shoulderL)
         // this.setShoulderDeg('R', pose.shoulderR)

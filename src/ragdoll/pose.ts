@@ -6,6 +6,10 @@ export type PuppetPose = {
     shoulderR: number
     handL: { x: number; y: number; z: number } // offset from hand's spawn position
     handR: { x: number; y: number; z: number }
+    headTilt: number, //tilt
+    headTurn: number, // turn
+    headRoll: number, // roll
+    puppeteerElbowDeg: number, // 0 = bind
 }
 
 export function defaultPose(): PuppetPose {
@@ -15,5 +19,9 @@ export function defaultPose(): PuppetPose {
         shoulderR: 0,
         handL: { x: 0, y: 0, z: 0 },
         handR: { x: 0, y: 0, z: 0 },
+        headTilt: 0,
+        headTurn: 0, 
+        headRoll: 0,
+        puppeteerElbowDeg: 0,
     }
 }
