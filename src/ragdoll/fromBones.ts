@@ -3,8 +3,8 @@ import type { RagdollConfig, PartDef, JointDef } from './config'
 export function makeCoreConfig(): RagdollConfig {
     const parts: PartDef[] = [
         { id: 'root', bodyType: 'fixed', density: 1 },
-        { id: 'puppeteer_upper_arm', parent: 'root', density: 1},
-        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1},
+        { id: 'puppeteer_upper_arm', parent: 'root', density: 1, bodyType: 'kinematic'},
+        { id: 'puppeteer_forearm', parent: 'puppeteer_upper_arm', density: 1, bodyType: 'kinematic'},
         { id: 'puppeteer_wrist', parent: 'puppeteer_forearm', density: 0.8, bodyType: 'kinematic'},
         { id: 'puppeteer_thumb', parent: 'puppeteer_wrist', density: 0.2 },
 

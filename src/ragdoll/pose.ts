@@ -9,7 +9,7 @@ export type PuppetPose = {
     headTilt: number, //tilt
     headTurn: number, // turn
     headRoll: number, // roll
-    puppeteerElbowDeg: number, // 0 = bind
+    puppeteerArmVertical: number, // 0 = bind
 }
 
 export function defaultPose(): PuppetPose {
@@ -22,6 +22,6 @@ export function defaultPose(): PuppetPose {
         headTilt: 0,
         headTurn: 0, 
         headRoll: 0,
-        puppeteerElbowDeg: 0,
+        puppeteerArmVertical: 0,
     }
 }

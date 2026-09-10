@@ -39,7 +39,7 @@ function makeGui() {
     head.add(pose, 'headTurn', -80, 80, 1).name('turn')
     head.add(pose, 'headRoll', -35, 35, 1).name('roll')
 
-    gui.add(pose, 'puppeteerElbowDeg', -70, 40, 1).name('puppeteer elbow bend')
+    gui.add(pose, 'puppeteerArmVertical', -0.2, 0.2, 0.01).name('puppeteer arm vertical bounce')
 
     const arms = gui.addFolder('arms')
     arms.add(pose, 'shoulderL', -90, 90, 1)
