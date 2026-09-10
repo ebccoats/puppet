@@ -60,13 +60,16 @@ export function makeArmChain(side: 'L' | 'R', density = 0.12): RagdollConfig {
     for (let i = 1; i <= 16; i++) {
         const id = `arm.${side}.${i}`
         const parent = i === 1 ? `shoulder.${side}` : `arm.${side}.${i - 1}`
+        const fromShoulder = i === 1
 
         parts.push({ id, parent, density })
         joints.push({
             id: `j-${parent}-${id}`,
             a: parent,
             b: id,
-            type: 'spherical',
+            type: fromShoulder ? 'spherical' : 'revolute',
+            axis: fromShoulder ? undefined : [1, 0, 0],
+            limits: fromShoulder ? undefined : [-2.2, 2.2],
         })
     }
 
@@ -79,7 +82,9 @@ export function makeArmChain(side: 'L' | 'R', density = 0.12): RagdollConfig {
         id: `j-arm16-hand.${side}`,
         a: `arm.${side}.16`,
         b: `hand.${side}`,
-        type: 'spherical',
+        type: 'revolute',
+        axis: [1, 0, 0],
+        limits: [-2.2, 2.2],
     })
 
     return {parts, joints}

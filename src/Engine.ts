@@ -38,13 +38,15 @@ function makeGui() {
     arms.add(pose, 'shoulderL', -90, 90, 1)
     arms.add(pose, 'shoulderR', -90, 90, 1)
 
+    const reachMax = ragdoll.armLength.get('L') ?? 0.5
+
     const reach = gui.addFolder('reach')
-    reach.add(pose.handL, 'x', -0.5, 0.5, 0.01).name('handL x')
-    reach.add(pose.handL, 'y', -0.5, 0.5, 0.01).name('handL y')
-    reach.add(pose.handL, 'z', -0.5, 0.5, 0.01).name('handL z')
-    reach.add(pose.handR, 'x', -0.5, 0.5, 0.01).name('handR x')
-    reach.add(pose.handR, 'y', -0.5, 0.5, 0.01).name('handR y')
-    reach.add(pose.handR, 'z', -0.5, 0.5, 0.01).name('handR z')
+    reach.add(pose.handL, 'x', -reachMax, reachMax, 0.01).name('handL x')
+    reach.add(pose.handL, 'y', -reachMax, reachMax, 0.01).name('handL y')
+    reach.add(pose.handL, 'z', -reachMax, reachMax, 0.01).name('handL z')
+    reach.add(pose.handR, 'x', -reachMax, reachMax, 0.01).name('handR x')
+    reach.add(pose.handR, 'y', -reachMax, reachMax, 0.01).name('handR y')
+    reach.add(pose.handR, 'z', -reachMax, reachMax, 0.01).name('handR z')
 
     gui.add(params, 'gravity', -40, 10, 0.1)
     gui.add(params, 'debugPhysics').onChange((v: boolean) => {

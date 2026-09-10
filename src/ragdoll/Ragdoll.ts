@@ -17,6 +17,8 @@ export class Ragdoll {
     handRest = new Map<string, THREE.Vector3>()
     armLength = new Map<string, number>()
 
+    boneOriginLocal = new Map<string, THREE.Vector3>()
+
     constructor(
         RAPIER: Rapier,
         world: InstanceType<Rapier['World']>,
@@ -63,7 +65,10 @@ export class Ragdoll {
 
         let body
 
+
         if (!nextId) {
+            this.boneOriginLocal.set(part.id, new THREE.Vector3(0,0,0))
+
             const pos = boneWorld(part.id)
             body = world.createRigidBody(desc.setTranslation(pos.x, pos.y, pos.z))
             const col = world.createCollider(RAPIER.ColliderDesc.cuboid(0.04, 0.04, 0.04), body)
@@ -74,6 +79,9 @@ export class Ragdoll {
             const b = boneWorld(nextId)
             const mid = a.clone().add(b).multiplyScalar(0.5)
             const len = Math.max(a.distanceTo(b) - gap, 0.04)
+
+            this.boneOriginLocal.set(part.id, new THREE.Vector3(0, -len / 2, 0))
+
             const quat = new THREE.Quaternion().setFromUnitVectors(
                 new THREE.Vector3(0, 1, 0),
                 b.clone().sub(a).normalize(),
@@ -95,6 +103,13 @@ export class Ragdoll {
 
         body.setAngularDamping(1)
         body.setLinearDamping(0.2)
+
+        if (part.id.startsWith('arm.') || part.id.startsWith('hand.')) {
+            body.setLinearDamping(10)
+            body.setAngularDamping(10)
+        }
+
+
         body.setEnabled(false) // freeze until you inspect
 
 
@@ -180,8 +195,21 @@ export class Ragdoll {
             axis = { x: axisLocal.x, y: axisLocal.y, z: axisLocal.z }
         }
 
+        const twistLock = 
+            RAPIER.JointAxesMask.LinX |
+            RAPIER.JointAxesMask.LinY |
+            RAPIER.JointAxesMask.LinZ |
+            RAPIER.JointAxesMask.AngX
+
         const data = 
-            joint.type === 'revolute'
+            joint.b === 'arm.L.1' || joint.b === 'arm.R.1'
+                ? RAPIER.JointData.generic(
+                    anchorA,
+                    anchorB,
+                    { x: 0, y: 1, z: 0 }, // bone = +Y on arm cuboid
+                    twistLock,
+                )
+            : joint.type === 'revolute'
                 ? RAPIER.JointData.revolute(anchorA, anchorB, axis!)
                 : RAPIER.JointData.spherical(anchorA, anchorB)
 
@@ -190,7 +218,6 @@ export class Ragdoll {
         if (joint.type === 'revolute' && joint.limits) {
             created.setLimits(joint.limits[0], joint.limits[1])
         }
-
 
         if (joint.b === 'puppeteer_thumb') {
             created.configureMotorModel(RAPIER.MotorModel.ForceBased)
@@ -211,6 +238,13 @@ export class Ragdoll {
 
         this.handTargets.set(side, target)
         this.handRest.set(side, new THREE.Vector3(t.x, t.y, t.z))
+        
+        const hand = this.bodies.get(`hand.${side}`)!
+        const data = RAPIER.JointData.spherical(
+            {x: 0, y: 0, z: 0}, // hand center of mass
+            {x: 0, y: 0, z: 0}, // ball center of mass
+        )
+        world.createImpulseJoint(data, hand, target, true)
     }
 
     this.armLength = new Map<string, number>()
@@ -225,6 +259,7 @@ export class Ragdoll {
         }
         len += prev.distanceTo(boneWorld(`hand.${side}`))
         this.armLength.set(side, len)
+
     }
 
     // end of constructor
@@ -249,9 +284,15 @@ export class Ragdoll {
             const rot = body.rotation()
             const bodyQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w)
 
-            if (id === 'root') {
+            if (
+                id === 'root' ||
+                id.startsWith('arm.') ||
+                id.startsWith('hand.')
+            ) {
                 const t  = body.translation()
+                const local = this.boneOriginLocal.get(id) ?? new THREE.Vector3()
                 const worldPos = new THREE.Vector3(t.x, t.y, t.z)
+                    .add(local.clone().applyQuaternion(bodyQuat))
                 bone.parent.worldToLocal(worldPos)
                 bone.position.copy(worldPos)
             }
@@ -320,35 +361,10 @@ export class Ragdoll {
         }
     }
 
-    pullHandsTowardsTargets(pose: PuppetPose, stiffness = 0.08) {
-        for (const side of ['L', 'R'] as const) {
-            const hand = this.bodies.get(`hand.${side}`)!
-            const target = this.handTargets.get(side)!
-            const h = hand.translation()
-            const t = target.translation()
-            const impulse = {
-                x: (t.x - h.x) * stiffness,
-                y: (t.y - h.y) * stiffness,
-                z: (t.z - h.z) * stiffness,
-            }
-            
-            const len = Math.hypot(impulse.x, impulse.y, impulse.z)
-            if (len > 0.03) {
-                const s = 0.03 / len
-                impulse.x *= s
-                impulse.y *= s
-                impulse.z *= s
-            }
-
-            hand.applyImpulse(impulse, true)
-        }
-    }
-
     setPose(pose: { thumbDeg: number; shoulderL: number; shoulderR: number }) {
         this.setThumbDeg(pose.thumbDeg, THUMB_BIND_DEG)
         // this.setShoulderDeg('L', pose.shoulderL)
         // this.setShoulderDeg('R', pose.shoulderR)
-        // this.setHandTargets(pose)
-        // this.pullHandsTowardsTargets(pose)
+        this.setHandTargets(pose)
     }
 }
