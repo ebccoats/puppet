@@ -135,16 +135,9 @@ export class Ragdoll {
 
     for (const part of config.parts) {
         const membership = bitOf.get(part.id)!
-        let filter = 0xffff
-        if (part.parent) filter &= ~bitOf.get(part.parent)!
-
-            for (const kid of childrenOf.get(part.id) ?? []) {
-                filter &= ~bitOf.get(kid)!
-            }
-
-            this.bodies.get(part.id)!.collider(0).setCollisionGroups(
-                groups(membership, filter),
-            )
+        this.bodies.get(part.id)!.collider(0).setCollisionGroups(
+            groups(membership, 0xffff)
+        )
     }
 
     for (const joint of config.joints) {
@@ -214,6 +207,7 @@ export class Ragdoll {
                 : RAPIER.JointData.spherical(anchorA, anchorB)
 
         const created = world.createImpulseJoint(data, bodyA, bodyB, true)
+        created.setContactsEnabled(false)
 
         if (joint.type === 'revolute' && joint.limits) {
             created.setLimits(joint.limits[0], joint.limits[1])
