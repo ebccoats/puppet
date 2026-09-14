@@ -7,6 +7,7 @@ import { RapierDebugRenderer } from './debug/RapierDebugRenderer'
 import { makePuppetConfig } from './ragdoll/fromBones'
 import { Ragdoll, groups } from './ragdoll/Ragdoll'
 import { defaultPose } from './ragdoll/pose'
+import { checkForGrantedDevices, requestDevice } from './dualsenseTrimmed.js'
 
 let RAPIER
 
@@ -70,6 +71,41 @@ function makeGui() {
         root.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
         root.wakeUp()
     }}, 'drop')
+}
+
+function applyDualSenseAccel(dt: number) {
+    const ds = (window as any).dshid
+    if (ds?.accelx == null) return
+
+
+    const pitch = Math.atan2(ds.accelx, ds.accely)
+    const range = 0.2
+    const targetY = THREE.MathUtils.clamp((pitch / (Math.PI / 4)) * range, -range, range)
+    pose.puppeteerArmVertical += (targetY - pose.puppeteerArmVertical) * (1 - Math.exp(-8 * dt))
+
+    if (ds.l2axis != null) {
+        pose.thumbDeg = THREE.MathUtils.lerp(90, 150, ds.l2axis)
+    }
+
+    const dead = 40
+    const scale = 0.008 // deg per gyro unit per second; tune
+    const rate = (v: number) => (Math.abs(v) < dead ? 0 : v) * scale
+
+
+    const maxPad = THREE.MathUtils.degToRad(10) // 10 on the pad = max head
+    const padPitch = Math.atan2(ds.accelx, ds.accely)
+    const padRoll = Math.atan2(ds.accelz, ds.accely)
+
+    const targetTilt = THREE.MathUtils.clamp((padRoll / maxPad) * 45, -45, 45)
+    const targetRoll = THREE.MathUtils.clamp((padPitch / maxPad) * 35, -35, 35)
+
+    const a = 1 - Math.exp(-6 * dt) // lower = smoother
+    pose.headTilt += (targetTilt - pose.headTilt) * a
+    pose.headRoll += (targetRoll - pose.headRoll) * a
+
+    pose.headTurn = THREE.MathUtils.clamp(
+        pose.headTurn + rate(ds.gyroy) * dt, -80, 80,
+    )
 }
 
 let puppet: Puppet
@@ -154,6 +190,9 @@ async function setup() {
     canvas.style.height = "100%"
     canvas.style.display = "block"
     makeGui()
+
+    document.getElementById('ds-connect')!.onclick = () => { requestDevice() }
+    checkForGrantedDevices()
 }
 
 
@@ -171,10 +210,17 @@ async function setup() {
 //         bone.position.z = position.R.z
 //     }
 // }
+let lastTime = 0
 
-function render( time ) {
+function render( time: number ) {
     // this is part 2 of the resizing thing
+
     time *= 0.001
+    
+    const dt = lastTime === 0
+        ? 1 / 60
+        : Math.min(time - lastTime, 1 / 30)
+    lastTime = time
 
     if (resizeRendererToDisplaySize(renderer)) {
         const canvas = renderer.domElement
@@ -185,8 +231,9 @@ function render( time ) {
     if (world) {
         world.gravity = { x: 0, y: params.gravity, z: 0 }
 
+        applyDualSenseAccel(dt)
         if (params.ragdoll) {
-            ragdoll.setPose(pose)
+            ragdoll.setPose(pose, dt)
         }
 
         world.step()

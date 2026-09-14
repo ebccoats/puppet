@@ -24,6 +24,14 @@ export class Ragdoll {
     forearmBind = new THREE.Matrix4()
     upperArmBind = new THREE.Matrix4()
 
+    wristPos = new THREE.Vector3()
+    wristQuat = new THREE.Quaternion()
+    wristInited = false
+
+    lastForearmY = 0
+    vySmooth = 0
+    forearmYInited = false
+
     constructor(
         RAPIER: Rapier,
         world: InstanceType<Rapier['World']>,
@@ -343,37 +351,32 @@ export class Ragdoll {
 
     }
 
-    setPuppeteerWrist(pose) {
-        const ft = this.bodies.get('puppeteer_forearm')!.translation()
-        const fr = this.bodies.get('puppeteer_forearm')!.rotation()
-        const forearmNow = new THREE.Matrix4().compose(
-            new THREE.Vector3(ft.x, ft.y, ft.z),
-            new THREE.Quaternion(fr.x, fr.y, fr.z, fr.w),
-            new THREE.Vector3(1, 1, 1),
-        )
-        
-        const wristNow = forearmNow.clone()
+    setPuppeteerWrist(pose, forearmNow, dt) {
+        const target = forearmNow.clone()
             .multiply(this.forearmBind.clone().invert())
             .multiply(this.wristBind)
 
+        const targetPos = new THREE.Vector3()
+        const targetQuat = new THREE.Quaternion()
+        target.decompose(targetPos, targetQuat, new THREE.Vector3())
+
+            this.wristPos.copy(targetPos)
+            this.wristQuat.copy(targetQuat)
 
         const head = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(
-                THREE.MathUtils.degToRad(pose.headTilt),
+                THREE.MathUtils.degToRad(pose.headTilt), 
                 THREE.MathUtils.degToRad(pose.headTurn),
                 THREE.MathUtils.degToRad(pose.headRoll),
                 'YXZ', // yaw, pitch, roll
             ),
         )
 
-        wristNow.multiply(new THREE.Matrix4().makeRotationFromQuaternion(head))
+        const q = this.wristQuat.clone().multiply(head)
 
-        const p = new THREE.Vector3()
-        const q = new THREE.Quaternion()
-        wristNow.decompose(p, q, new THREE.Vector3())
         const wrist = this.bodies.get('puppeteer_wrist')!
 
-        wrist.setNextKinematicTranslation({ x: p.x, y: p.y, z: p.z })
+        wrist.setNextKinematicTranslation({ x: this.wristPos.x, y: this.wristPos.y, z: this.wristPos.z })
         wrist.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w})
         wrist.wakeUp()
 
@@ -454,9 +457,9 @@ export class Ragdoll {
         }
     }
 
-    setPose(pose: { thumbDeg: number; shoulderL: number; shoulderR: number }) {
+    setPose(pose, dt: number) {
         const forearmNow = this.setPuppeteerForearm(pose.puppeteerArmVertical)
-        this.setPuppeteerWrist(pose, forearmNow)
+        this.setPuppeteerWrist(pose, forearmNow, dt)
         this.setThumbDeg(pose.thumbDeg, THUMB_BIND_DEG)
         // this.setShoulderDeg('L', pose.shoulderL)
         // this.setShoulderDeg('R', pose.shoulderR)
