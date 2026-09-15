@@ -77,16 +77,17 @@ function applyDualSenseAccel(dt: number) {
     const ds = (window as any).dshid
     if (ds?.accelx == null) return
 
-
-    const pitch = Math.atan2(ds.accelx, ds.accely)
-    const range = 0.2
-    const targetY = THREE.MathUtils.clamp((pitch / (Math.PI / 4)) * range, -range, range)
-    pose.puppeteerArmVertical += (targetY - pose.puppeteerArmVertical) * (1 - Math.exp(-8 * dt))
-
     if (ds.l2axis != null) {
         pose.thumbDeg = THREE.MathUtils.lerp(90, 150, ds.l2axis)
     }
 
+    if (ds.lsy != null) {
+        const dead = 0.12
+        const y = Math.abs(ds.lsy) < dead ? 0 : -ds.lsy
+        const range = 0.2
+        const targetY = THREE.MathUtils.clamp(y * range, -range, range)
+        pose.puppeteerArmVertical += (targetY - pose.puppeteerArmVertical) * (1 - Math.exp(-8 * dt))
+    }
     const dead = 40
     const scale = 0.008 // deg per gyro unit per second; tune
     const rate = (v: number) => (Math.abs(v) < dead ? 0 : v) * scale
@@ -103,8 +104,9 @@ function applyDualSenseAccel(dt: number) {
     pose.headTilt += (targetTilt - pose.headTilt) * a
     pose.headRoll += (targetRoll - pose.headRoll) * a
 
+    const turnRate = rate(ds.gyroy)
     pose.headTurn = THREE.MathUtils.clamp(
-        pose.headTurn + rate(ds.gyroy) * dt, -80, 80,
+        pose.headTurn + turnRate * dt, -80, 80,
     )
 }
 

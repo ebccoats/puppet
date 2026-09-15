@@ -118,9 +118,14 @@ export class Ragdoll {
         body.setAngularDamping(1)
         body.setLinearDamping(0.2)
 
+        if (part.id.startsWith('shoulder.') || part.id.startsWith('hip.')) {
+            body.setLinearDamping(12)
+            body.setAngularDamping(16)
+        }
+
         if (part.id.startsWith('arm.') || part.id.startsWith('hand.')) {
-            body.setLinearDamping(10)
-            body.setAngularDamping(10)
+            body.setLinearDamping(25)
+            body.setAngularDamping(25)
         }
 
 

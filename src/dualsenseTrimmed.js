@@ -413,6 +413,12 @@ export class DualSenseHid {
     let battery1 = report.getUint8(54);
     // bytes 55-76?
 
+      const normalizeThumbStickAxis = value => (2 * value / 0xFF) - 1.0
+
+    let lsx = normalizeThumbStickAxis(axes0);
+		let lsy = normalizeThumbStickAxis(axes1);
+		let rsx = normalizeThumbStickAxis(axes2);
+		let rsy = normalizeThumbStickAxis(axes3);
     let l2axis = normalizeTriggerAxis(axes4);
     let r2axis = normalizeTriggerAxis(axes5);
 
@@ -442,6 +448,11 @@ export class DualSenseHid {
         this.accelx = accelx
         this.accely = accely
         this.accelz = accelz
+
+      this.lsx = lsx
+      this.lsy = lsy
+      this.rsx = rsx
+      this.rsy = rsy
 
   }
 

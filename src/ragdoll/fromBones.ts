@@ -59,7 +59,9 @@ export function makeCoreConfig(): RagdollConfig {
     return { parts, joints }
 }
 
-export function makeArmChain(side: 'L' | 'R', density = 0.12): RagdollConfig {
+// density here and linear/angular damping in part.id in Ragdoll.ts 
+// adjusts the 'jello-ness' of the arm sleeves
+export function makeArmChain(side: 'L' | 'R', density = 0.35): RagdollConfig {
     const parts: PartDef[] = []
     const joints: JointDef[] = []
 
