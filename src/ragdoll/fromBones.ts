@@ -30,7 +30,7 @@ export function makeCoreConfig(): RagdollConfig {
             const thumb = part.id === 'puppeteer_thumb'
             const shoulder = part.id === 'shoulder.L' || part.id === 'shoulder.R'
             const puppeteerElbow = part.id === 'puppeteer_forearm'
-            const hinge = knee || thumb || puppeteerElbow
+            const hinge = knee || thumb || puppeteerElbow || shoulder
             return {
                 id: `j-${part.parent}-${part.id}`,
                 a: part.parent!,
@@ -61,7 +61,7 @@ export function makeCoreConfig(): RagdollConfig {
 
 // density here and linear/angular damping in part.id in Ragdoll.ts 
 // adjusts the 'jello-ness' of the arm sleeves
-export function makeArmChain(side: 'L' | 'R', density = 0.35): RagdollConfig {
+export function makeArmChain(side: 'L' | 'R', density = 0.5): RagdollConfig {
     const parts: PartDef[] = []
     const joints: JointDef[] = []
 
@@ -77,7 +77,7 @@ export function makeArmChain(side: 'L' | 'R', density = 0.35): RagdollConfig {
             b: id,
             type: fromShoulder ? 'spherical' : 'revolute',
             axis: fromShoulder ? undefined : [1, 0, 0],
-            limits: fromShoulder ? undefined : [-2.2, 2.2],
+            limits: fromShoulder ? undefined : [-0.6, 0.6],
         })
     }
 

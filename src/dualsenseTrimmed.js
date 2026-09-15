@@ -441,6 +441,11 @@ export class DualSenseHid {
 		let batteryCharging = !!(battery1 & 0x08);
 
 
+
+
+      this.r1 = !!(buttons1 & 0x02)
+      this.l1 = !!(buttons1 & 0x01)
+      this.r2axis = r2axis
       this.l2axis = l2axis
         this.gyrox = gyrox
         this.gyroy = gyroy
@@ -703,9 +708,11 @@ export const requestDevice = async () => {
     ]
   };
 
+    let device
+
   try {
     let devices = await navigator.hid.requestDevice(requestOptions);
-    let device = devices[0];
+    device = devices[0];
   } catch(e) {}
 
   if (!device)

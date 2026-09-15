@@ -124,8 +124,8 @@ export class Ragdoll {
         }
 
         if (part.id.startsWith('arm.') || part.id.startsWith('hand.')) {
-            body.setLinearDamping(25)
-            body.setAngularDamping(25)
+            body.setLinearDamping(0.2)
+            body.setAngularDamping(60)
         }
 
 
@@ -320,9 +320,9 @@ export class Ragdoll {
     }
     
     syncBones(puppet: Puppet) {
-        for (const id of this.bodies.keys()) {
+        for (const [id, body] of this.bodies) {
+            if (!body.isEnabled()) continue
             const bone = puppet.skeleton.getBoneByName(id)
-            const body = this.bodies.get(id)
             
             if (!bone?.parent) continue
 
@@ -431,43 +431,82 @@ export class Ragdoll {
         this.bodies.get(id)!.wakeUp()
     }
 
-    setHandTargets(pose: { handL: {x: number; y: number; z: number}; handR: { x: number; y: number; z: number} }) {
+    setHandTargets(pose, plane: THREE.Object3D) {
+        plane.updateMatrixWorld(true)
+        const origin = new THREE.Vector3()
+        const quat = new THREE.Quaternion()
+        plane.getWorldPosition(origin)
+        plane.getWorldQuaternion(quat)
+        const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(quat)
+
+        const project = (p: THREE.Vector3) => {
+            const d = p.clone().sub(origin).dot(normal)
+            return p.sub(normal.clone().multiplyScalar(d))
+        }
 
         for (const side of ['L', 'R'] as const) {
             const rest = this.handRest.get(side)!
             const off = pose[`hand${side}`]
-            const world = new THREE.Vector3(
+            let world = new THREE.Vector3(
                 rest.x + off.x,
                 rest.y + off.y,
                 rest.z + off.z,
             )
+            world = project(world)
 
-            const origin = this.bodies.get(`shoulder.${side}`)!.translation()
+            const originS = this.bodies.get(`shoulder.${side}`)!.translation()
+            const shoulder = new THREE.Vector3(originS.x, originS.y, originS.z)
             const max = this.armLength.get(side)!
-            const dx = world.x - origin.x
-            const dy = world.y - origin.y
-            const dz = world.z - origin.z
-            const dist = Math.hypot(dx, dy, dz)
-
-            if (dist > max && dist > 1e-6) {
-                const s = max / dist
-                world.x = origin.x + dx * s
-                world.y = origin.y + dy * s
-                world.z = origin.z + dz * s
+            const center = project(shoulder.clone())
+            const distToPlane = shoulder.clone().sub(origin).dot(normal)
+            
+            const r = Math.sqrt(Math.max(0, max * max - distToPlane * distToPlane))
+            const d = world.distanceTo(center)
+            if (d > r && d > 1e-6) {
+                world.sub(center).multiplyScalar(r / d).add(center)
             }
 
             this.handTargets.get(side)!.setNextKinematicTranslation({
                 x: world.x, y: world.y, z: world.z,
             })
+
         }
     }
 
-    setPose(pose, dt: number) {
+    clampArmSpeed(maxLin = 2, maxAng = 4) {
+        for (const [id, body] of this.bodies) {
+            if (!id.startsWith('arm.') && !id.startsWith('hand.')) continue
+            if (!body.isEnabled()) continue
+
+            const v = body.linvel()
+            const speed = Math.hypot(v.x, v.y, v.z)
+            if (speed > maxLin) {
+                const s = maxLin / speed
+                body.setLinvel({ x: v.x * s, y: v.y * s, z: v.z * s}, true)
+            }
+
+            const w = body.angvel()
+            const spin = Math.hypot(w.x, w.y, w.z)
+            if (spin > maxAng) {
+                const s = maxAng / spin
+                body.setAngvel({ x: w.x * s, y: w.y * s, z: w.z * s}, true)
+            }
+        }
+    }
+
+    captureHandRest() {
+        for (const side of ['L', 'R'] as const) {
+            const t = this.bodies.get(`hand.${side}`)!.translation()
+            this.handRest.get(side)!.set(t.x, t.y, t.z)
+        }
+    }
+
+    setPose(pose, dt: number, armPlane: THREE.Object3D) {
         const forearmNow = this.setPuppeteerForearm(pose.puppeteerArmVertical)
         this.setPuppeteerWrist(pose, forearmNow, dt)
         this.setThumbDeg(pose.thumbDeg, THUMB_BIND_DEG)
         // this.setShoulderDeg('L', pose.shoulderL)
         // this.setShoulderDeg('R', pose.shoulderR)
-        this.setHandTargets(pose)
+        this.setHandTargets(pose, armPlane)
     }
 }
