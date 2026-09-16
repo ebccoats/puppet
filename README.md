@@ -7,8 +7,8 @@ realtime henson-like puppet with threejs and rapier, project at [Recurse Center]
 - [x] sample threejs scene with lil-gui over top
 - [x] import rigged puppet and place puppet in threejs scene
 - [x] ragdoll puppet with rapier3d
-- [ ] set up impulse joints connected to lil-gui
-- [ ] set up webhid controller connection in between joints & lil-gui readout
+- [x] set up impulse joints connected to lil-gui
+- [x] set up webhid controller connection in between joints & lil-gui readout
 
 
 ### The puppet
@@ -26,11 +26,13 @@ realtime henson-like puppet with threejs and rapier, project at [Recurse Center]
 I was trying to learn, so I coded this by hand. I used AI to: 
 - debug (point it at my project directory/file and ask why it's not working)
 - draft a tutorial based on a github project's commits so I could work through rebuilding the project
-- give instructions sometimes
+- give instructions and code examples for the harder stuff, which I retyped over to try to understand how things work
 
 
 ### Resources I used making this:
 - [CGDive Blender Rigging Tuts](https://www.youtube.com/@CGDive)
+- [Three.js Manual](https://threejs.org/manual/)
 - [viridia/demo-rapier-three](https://github.com/viridia/demo-rapier-three)
+- [mattvb91/rapierjs-ragdoll](https://github.com/mattvb91/rapierjs-ragdoll)
 - [nondebug/dualsense](https://github.com/nondebug/dualsense)
 - my batchmates at [Recurse Center](http://www.recurse.com)
